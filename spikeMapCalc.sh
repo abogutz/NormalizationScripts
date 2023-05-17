@@ -39,48 +39,58 @@ echo "Testing "$REF_NAME" and "$SPIKE_NAME"..."
 REF_BED="$SCRATCH/Ref.bed"
 REF_FASTA="$SCRATCH/Ref.fa"
 REF_FASTQ="$SCRATCH/Ref_R"$READ_LEN"-w"$SLIDING_WIN".fq"
-REF_FASTQ_GZ="$REF_FASTQ.gz"
+REF_FASTQ_GZ=$(basename $REF_FASTQ)".gz"
 SAM="$SCRATCH/temp.sam"
 REF_BAM=$REF_NAME"_R"$READ_LEN"-w"$SLIDING_WIN".bam"
 REF_TXT=$REF_NAME"_R"$READ_LEN"-w"$SLIDING_WIN".txt"
-CAT="$SCRATCH/${REF//.fa/}"+"${SPIKE//.fa/}.fa"
+CAT="${REF//.fa/}"+"${SPIKE//.fa/}.fa"
 CAT_BAM=$REF_NAME"+"$SPIKE_NAME"_R"$READ_LEN"-w"$SLIDING_WIN".bam"
 CAT_TXT=$REF_NAME"+"$SPIKE_NAME"_R"$READ_LEN"-w"$SLIDING_WIN".txt"
 
 if [[ ! -f $REF_FASTQ_GZ ]]; then
 	echo "Creating windowed fastq..."
+	echo "Creating genomic windows..."
 	bedtools makewindows -w $READ_LEN -s $SLIDING_WIN -b $BED > $REF_BED
+	echo "Extracting sequence..."
 	bedtools getfasta -fi $REF -fo $REF_FASTA -bed $REF_BED
 	rm $REF_BED
+	echo "Converting to Fastq..."
 	seqtk seq -F '#' $REF_FASTA > $REF_FASTQ
 	rm $REF_FASTA
+	echo "Zipping Fastq..."
 	gzip $REF_FASTQ
+	mv $REF_FASTQ.gz $REF_FASTQ_GZ
 fi
 
 if [[ ! -f $REF_TXT ]]; then
 #	bwa index $REF
+	echo "Aligning to Reference..."
 	bwa mem -t $RUN_THREAD $REF $REF_FASTQ_GZ > $SAM
 	samtools view -bhS -@ $RUN_THREAD $SAM > $REF_BAM
-
+	echo "Calculating Mappability..."
 	samtools view $REF_BAM | cut -f 5 | awk 'BEGIN{for(x=0; x<256; x++){a[x]=0}}{
 		a[$1]++
 	 } END {for(x=0; x<256; x++){print x, a[x]}}' > $REF_TXT
 fi
 
 if [[ ! -f $CAT ]]; then # Create concatenated genome
+	echo "Creating concatenated genome..."
+	TEMP=$SCRATCH/temp
+	TEMP2=$SCRATCH/temp2
 	CHR_PREFIX=">$REF_NAME_"
-	cat $REF | sed "s/>/$CHR_PREFIX/g" > temp
+	cat $REF | sed "s/>/$CHR_PREFIX/g" > $TEMP
 	CHR_PREFIX=">$SPIKE_NAME_"
-	cat $SPIKE | sed "s/>/$CHR_PREFIX/g" > temp2
-	cat temp temp2 > $CAT
-	rm temp temp2
+	cat $SPIKE | sed "s/>/$CHR_PREFIX/g" > $TEMP2
+	cat $TEMP $TEMP2 > $CAT
+	rm $TEMP $TEMP2
 	bwa index $CAT
 fi
 
+echo "Aligning to Concatenated genome..."
 bwa mem -t $RUN_THREAD $CAT $REF_FASTQ_GZ > $SAM
 samtools view -bhS -@ $RUN_THREAD $SAM > $CAT_BAM
 rm $SAM
-
+echo "Calculating concatenated mappability..."
 samtools view $CAT_BAM | cut -f 5 | awk 'BEGIN {
 	for(x=0; x<256; x++) {
 		a[x]=0;
@@ -89,6 +99,7 @@ samtools view $CAT_BAM | cut -f 5 | awk 'BEGIN {
 	a[$1]++;
 } END {for(x=0; x<256; x++){print x, a[x]}}' > $CAT_TXT
 
+echo "Creating Mappability bigwigs..."
 for FILE in $REF_BAM $CAT_BAM
 do
 	samtools view $FILE | awk -v win=$SLIDING_WIN 'OFS="\t"{
