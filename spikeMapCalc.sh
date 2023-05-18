@@ -64,7 +64,7 @@ fi
 
 if [[ ! -f $REF_TXT ]]; then
 #	bwa index $REF
-	echo "Aligning to Reference..."
+	echo "Aligning to "$REF_NAME"..."
 	bwa mem -t $RUN_THREAD $REF $REF_FASTQ_GZ > $SAM
 	samtools view -bhS -@ $RUN_THREAD $SAM > $REF_BAM
 	echo "Calculating Mappability..."
@@ -78,11 +78,14 @@ if [[ ! -f $CAT ]]; then # Create concatenated genome
 	TEMP=$SCRATCH/temp
 	TEMP2=$SCRATCH/temp2
 	CHR_PREFIX=">$REF_NAME_"
+	echo $REF_NAME
 	cat $REF | sed "s/>/$CHR_PREFIX/g" > $TEMP
+	echo $SPIKE_NAME
 	CHR_PREFIX=">$SPIKE_NAME_"
 	cat $SPIKE | sed "s/>/$CHR_PREFIX/g" > $TEMP2
 	cat $TEMP $TEMP2 > $CAT
 	rm $TEMP $TEMP2
+	echo "Indexing..."
 	bwa index $CAT
 fi
 
