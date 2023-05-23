@@ -12,6 +12,7 @@
 # 2 = Ref .bed file of all chr
 # 3 = Spike-In .fa file
 
+module load kentutils
 module load bedtools/2.30.0
 module load seqtk/1.3
 module load samtools/1.12
@@ -47,6 +48,9 @@ CAT=$REF_NAME"+"$SPIKE_NAME".fa"
 CAT_BAM=$REF_NAME"+"$SPIKE_NAME"_R"$READ_LEN"-w"$SLIDING_WIN".bam"
 CAT_TXT=$REF_NAME"+"$SPIKE_NAME"_R"$READ_LEN"-w"$SLIDING_WIN".txt"
 
+TEMP=$SCRATCH/temp
+TEMP2=$SCRATCH/temp2
+
 if [[ ! -f $REF_FASTQ_GZ ]]; then
 	echo "Creating windowed fastq..."
 	echo "Creating genomic windows..."
@@ -75,8 +79,6 @@ fi
 
 if [[ ! -f $CAT ]]; then # Create concatenated genome
 	echo "Creating concatenated genome..."
-	TEMP=$SCRATCH/temp
-	TEMP2=$SCRATCH/temp2
 	CHR_PREFIX=">"$REF_NAME"_"
 	echo $REF_NAME
 	cat $REF | sed "s/>/$CHR_PREFIX/g" > $TEMP
@@ -93,6 +95,7 @@ echo "Aligning to Concatenated genome..."
 bwa mem -t $RUN_THREAD $CAT $REF_FASTQ_GZ > $SAM
 samtools view -bhS -@ $RUN_THREAD $SAM > $CAT_BAM
 rm $SAM
+
 echo "Calculating concatenated mappability..."
 samtools view $CAT_BAM | cut -f 5 | awk 'BEGIN {
 	for(x=0; x<256; x++) {
@@ -106,11 +109,12 @@ echo "Creating Mappability bigwigs..."
 for FILE in $REF_BAM $CAT_BAM
 do
 	samtools view $FILE | awk -v win=$SLIDING_WIN 'OFS="\t"{
-		split($1, a, /[:,]/);
+		split($1, a, /[:,-]/);
 		print a[1], a[2], a[2]+win-1, $5/60;
-	}' > ${FILE//.bam/.bedgraph}
-	bedGraphToBigWig ${FILE//.bam/.bedgraph} $SIZES ${FILE//.bam/_mappability.bw}
+	}' > $TEMP
+	bedtools intersect -a $TEMP -b $SIZES > $TEMP2
+	bedGraphToBigWig $TEMP2 $SIZES ${FILE//.bam/_mappability.bw}
 done
 
-rm -r $SCRATCH
+#rm -r $SCRATCH
 
