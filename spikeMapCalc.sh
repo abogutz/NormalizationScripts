@@ -112,7 +112,7 @@ do
 		split($1, a, /[:,-]/);
 		print a[1], a[2], a[2]+win-1, $5/60;
 	}' > $TEMP
-	bedtools intersect -a $TEMP -b $SIZES > $TEMP2
+	bedtools intersect -a $TEMP -b $BED > $TEMP2
 	bedGraphToBigWig $TEMP2 $SIZES ${FILE//.bam/_mappability.bw}
 done
 
