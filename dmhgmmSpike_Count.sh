@@ -29,6 +29,8 @@ BAM_COVERAGE="/project/def-mlorincz/scripts/utilities/miniconda3/bin/bamCoverage
 
 echo -e "Name\tDm_Reads\tDm_Reads_MapQ\tDm_Reads_MapQ_NoDup\tHg_Reads\tHg_Reads_MapQ\tHg_Reads_MapQ_NoDup\tMm_Reads\tMm_Reads_MapQ\tMm_Reads_MapQ_NoDup\tUnmapped" >> spike_stats.txt
 
+mkdir $TEMP_DIR
+
 for FILE in *.bam
 do
 	DM_SAM=$TEMP_DIR/${FILE//.bam/_dm6.sam}
@@ -38,9 +40,9 @@ do
 	MM_SAM=$TEMP_DIR/${FILE//.bam/_mm10.sam}
 	MM_BAM=${FILE//.bam/_mm10.bam}
 	$VIEW $FILE | awk -v dm=$DM_SAM -v hg=$HG_SAM -v mm=$MM_SAM '{
-		if ($3 ~ "dm*") {
+		if ($3 ~ /dm/) {
 			print > dm;
-		} else if ($3 ~ "hg*") {
+		} else if ($3 ~ /hg/) {
 			print > hg;
 		} else {
 			print > mm;
@@ -93,3 +95,5 @@ do
 	$BAM_COVERAGE --binSize 1 -p $THREADS --normalizeUsing CPM --smoothLength 0 --outFileFormat bigwig --minMappingQuality 5 --ignoreDuplicates -b $MM_BAM --outFileName ${MM_BAM//.bam/.bw}
 done
 
+
+rm -r $TEMP_DIR
