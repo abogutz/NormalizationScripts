@@ -13,7 +13,7 @@
 
 module load samtools
 
-THREADS=8
+THREADS=$SLURM_CPUS_PER_TASK
 MEM=4G
 BIN_SIZE=1
 SMOOTH_WIN=0
@@ -67,14 +67,14 @@ do
 	mv $TEMP $HG_SAM
 	cat $HEADER_MM $MM_SAM > $TEMP
 	mv $TEMP $MM_SAM
-	rm $HEADER_DM $HEADER_MM
+	rm $HEADER_DM $HEADER_MM $HEADER_HG
 	$VIEW -bh -o $DM_BAM $DM_SAM
 	samtools index $DM_BAM
 	$VIEW -bh -o $HG_BAM $HG_SAM
 	samtools index $HG_BAM
 	$VIEW -bh -o $MM_BAM $MM_SAM
 	samtools index $MM_BAM
-	rm $DM_SAM $MM_SAM
+	rm $DM_SAM $MM_SAM $HG_SAM
 	DM=`$VIEW -c $DM_BAM`
 	DM_MQ=`$VIEW -c -q $MAPQ $DM_BAM`
 	DM_MQDP=`$VIEW -c -q $MAPQ -F 1024 $DM_BAM`
